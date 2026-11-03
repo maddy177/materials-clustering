@@ -1,0 +1,18 @@
+# Limitations and assumptions log
+
+1. Scope: structural metals only (steel, stainless, aluminium, copper alloys, cast iron, magnesium). No superalloys, titanium or ceramics in the source data.
+2. No thermal conductivity in the source data, so it is not a feature.
+3. Hardness (HV/HB) is ~58% missing and missing by family (never reported for copper and magnesium alloys), so it is excluded from the main model.
+4. 8 yield-strength cells were specification limits ("280 max"), set to missing. 5 rows dropped (yield > tensile, or yield missing).
+5. 291 rows removed as duplicates (same Su, Sy, elongation, E, density under different national standards): 1,552 -> 1,261 -> 1,256.
+6. Elongation: 131 values KNN-imputed (benchmark error ~1.6x), flagged in the data. 21 grey-iron rows had no reported elongation (brittle material) and were first set to 0.5%.
+7. Family labels come from text rules, used only for validation, never as a model input.
+8. Density and modulus are near-constant within a family. Magnesium and aluminium share the same modulus in the source, so modulus is a rough family-level value.
+9. Magnesium modulus equals aluminium's in the source (73 GPa; textbook ~45 GPa). Evidence: Mg specific stiffness 41.7 vs ~26 for all other metals. Modulus is treated as a rough family-level value.
+10. A robustness check showed that a "brittle" cluster was formed mostly by those 21 assumed values (ARI 0.948 without them, but the cluster dissolved). They were therefore excluded from clustering (1,256 -> 1,235 rows) and assigned afterwards using the four known properties. Evidence: notebook 05a.
+11. Choice of K: K=4 (best silhouette and Davies-Bouldin for k>=3, bend in the elbow, reproducible with 20 starts, ARI 0.993 across seeds). K=3 merges copper alloys with steels; K=5 additionally splits light alloys into wrought and low-ductility cast groups; K=6 is not reproducible (min ARI 0.795). Silhouette 0.42 means moderate separation.
+12. These five properties do not distinguish stainless from plain steel (no chemistry or corrosion data), so clusters reflect mechanical similarity, not composition.
+13. Algorithm comparison (K=4): Ward ARI 0.745 vs K-Means (disagreement mainly at the medium/high steel-strength boundary, a continuum); GMM ARI 0.484 and worst on all internal metrics. Internal metrics favour K-Means' compact clusters.
+14. 21 grey-iron rows (no reported elongation) were not clustered. Their nearest centroid on the four known properties was "Ductile copper alloys" (19) or medium-strength steels (2), which contradicts their brittleness. Only 2 of 21 lie beyond the 95th-percentile centroid distance of normal members (1.66), so the exclusion rests on the missing elongation, not geometric misfit. They are kept as a separate flagged group; the nearest centroid is recorded for information only.
+15. Sensitivity: clusters are stable under resampling (ARI 0.984), seeds (0.993) and exclusion of imputed elongation rows (0.994), but depend on the log transform (ARI 0.471 without it) and on modulus (0.566 if dropped). Modulus is a coarse family-level value in the source data (item 8).
+16. Agreement with rule-based families is moderate (ARI 0.406, NMI 0.551): aluminium/magnesium and copper alloys are recovered, but steel, stainless and cast iron are distributed across two strength-tier clusters.
