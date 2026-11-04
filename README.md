@@ -30,7 +30,12 @@ flowchart TD
     L --> M["Choose K<br/>elbow, silhouette, Davies-Bouldin, Calinski-Harabasz<br/>reproducibility across seeds"]
     M --> N["K-Means, K = 4"]
     N --> O["Compare Ward hierarchical and GMM"]
-    N --> P["Visualization<br/>PCA biplot, t-SNE"]
+    N --> P1["PCA on scaled data<br/>variance explained, loadings"]
+    P1 --> P2["PCA biplot<br/>coloured by cluster and by family"]
+    N --> P3["t-SNE<br/>perplexities 10, 30, 60"]
+    P2 --> P4["Trustworthiness<br/>PCA vs t-SNE"]
+    P3 --> P4
+    P4 --> R
     N --> Q["Evaluation<br/>resampling stability, family agreement, ablations"]
     O --> Q
     N --> R["Cluster profiling and naming"]
