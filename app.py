@@ -1,11 +1,13 @@
 import sys
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import pandas as pd
 import streamlit as st
 
 # let the app find src/selector.py
 sys.path.append(str(Path(__file__).resolve().parent / "src"))
-from selector import load_all, filter_materials, recommend
+from selector import load_all, filter_materials, recommend, DATA_DIR
 
 st.set_page_config(page_title="Material selector", layout="wide")
 
@@ -13,6 +15,11 @@ st.set_page_config(page_title="Material selector", layout="wide")
 @st.cache_data
 def get_all():
     return load_all()
+
+
+@st.cache_data
+def get_pca():
+    return pd.read_csv(DATA_DIR / "pca_coords.csv")
 
 
 all_df = get_all()
@@ -57,10 +64,32 @@ with tab1:
             st.bar_chart(matches["cluster_name"].value_counts())
             st.write(f"Top {min(top, len(matches))} matches, ranked by {rank_by}")
             table = recommend(all_df, constraints, rank_by=rank_by, top=top, families=families)
-            st.dataframe(table, hide_index=True, use_container_width=True)
+            st.dataframe(table, hide_index=True)
 
 with tab2:
-    st.info("Cluster map: added in the next step.")
+    if not families:
+        st.warning("Select at least one family.")
+    else:
+        pca = get_pca()
+        matches = filter_materials(all_df, constraints, families)
+        # grey-iron labels repeat, so keep one row per label before looking up clusters
+        cluster_of = all_df.drop_duplicates("label").set_index("label")["cluster_name"]
+        hit = pca["label"].isin(matches["label"])
+
+        fig, ax = plt.subplots(figsize=(9, 6))
+        ax.scatter(pca["PC1"], pca["PC2"], s=10, color="lightgrey", label="all materials")
+        shown = pca[hit].assign(cluster=pca.loc[hit, "label"].map(cluster_of))
+        for name, grp in shown.groupby("cluster"):
+            ax.scatter(grp["PC1"], grp["PC2"], s=22, label=f"{name} ({len(grp)})")
+        ax.set_xlabel("PC1 (61% of variance): overall heft, strength + stiffness + density")
+        ax.set_ylabel("PC2 (28% of variance): ductility versus strength")
+        ax.legend(fontsize=8)
+        st.pyplot(fig)
+        plt.close(fig)
+
+        grey_matches = int(matches["cluster_name"].str.startswith("Grey", na=False).sum())
+        st.write(f"{int(hit.sum())} matching materials are drawn. "
+                 f"{grey_matches} matching grey-iron rows are not on the map because they were not clustered.")
 
 with tab3:
-    st.info("Find substitutes: added in a later step.")
+    st.info("Find substitutes: added in the next step.")
