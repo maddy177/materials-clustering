@@ -7,7 +7,8 @@ import streamlit as st
 
 # let the app find src/selector.py
 sys.path.append(str(Path(__file__).resolve().parent / "src"))
-from selector import load_all, filter_materials, recommend, DATA_DIR
+from selector import (load_all, load_scaled, filter_materials, recommend,
+                      similar_to, CORE, DATA_DIR)
 
 st.set_page_config(page_title="Material selector", layout="wide")
 
@@ -18,11 +19,17 @@ def get_all():
 
 
 @st.cache_data
+def get_scaled():
+    return load_scaled()
+
+
+@st.cache_data
 def get_pca():
     return pd.read_csv(DATA_DIR / "pca_coords.csv")
 
 
 all_df = get_all()
+X, meta = get_scaled()
 all_families = sorted(all_df["family"].dropna().unique())
 
 st.title("Material selector")
@@ -92,4 +99,26 @@ with tab2:
                  f"{grey_matches} matching grey-iron rows are not on the map because they were not clustered.")
 
 with tab3:
-    st.info("Find substitutes: added in the next step.")
+    st.write("Pick a material to see which others have the closest overall properties. "
+             "Distance is measured in the scaled property space used for clustering, "
+             "so a smaller distance means more similar. It has no units.")
+
+    labels = list(X.index)
+    default = labels.index("Steel SAE 4140 | normalized") if "Steel SAE 4140 | normalized" in labels else 0
+    chosen = st.selectbox("Material (click and type to search)", labels, index=default)
+    n_sub = st.slider("Number of substitutes", 3, 10, 5)
+
+    st.write("Selected material")
+    st.dataframe(meta.loc[[chosen], ["family", "cluster_name"] + CORE])
+
+    subs = similar_to(X, meta, chosen, n=n_sub)
+    subs["different family"] = subs["family"] != meta.loc[chosen, "family"]
+    subs["elongation imputed"] = meta.loc[subs.index, "elongation_imputed"].astype(bool)
+    st.write(f"Closest {n_sub} materials")
+    st.dataframe(subs)
+
+    n_cross = int(subs["different family"].sum())
+    if n_cross:
+        st.write(f"{n_cross} of these belong to a different family. They are alternatives "
+                 "that behave similarly on the five mechanical properties, "
+                 "but check chemistry, corrosion and temperature behaviour before using them.")
