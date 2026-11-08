@@ -92,15 +92,30 @@ flowchart TD
 ## 7. Material recommender (notebook 08)
 `recommend({...})` filters by property constraints and ranks by a chosen metric; `similar_to(label)` returns the closest materials in scaled property space. Example: tensile ≥ 900 MPa and elongation ≥ 10% returns only high-strength steels (SAE 4150, 4340, 8650 tempered at 400°F); density ≤ 3 g/cm³ and tensile ≥ 300 MPa returns only light alloys led by 7xxx aluminium.
 
+## 7b. Interactive page (Streamlit)
+A small web page runs the recommender with sliders, so no code needs to be edited. It runs only on your own computer; nothing is published online.
+
+- **Find materials:** set minimum tensile strength, minimum elongation, maximum density and families, choose a ranking property, and see the matching materials and a bar chart of which clusters they fall in. Rows with an estimated elongation, and grey-iron rows with no reported elongation, are marked in a `note` column.
+- **Cluster map:** the PCA plot with the matching materials highlighted by cluster.
+- **Find substitutes:** pick a material and see the closest materials in scaled property space, with a flag when they belong to a different family.
+
+The page contains no new analysis. It reads the files the notebooks saved and calls the same functions as notebook 08 (`src/selector.py`). A "Self-check" button re-runs the three notebook scenarios and compares the match counts (65, 99 and 157).
+
+![Find materials](figures/app_find_materials.png)
+![Cluster map](figures/app_cluster_map.png)
+![Find substitutes](figures/app_substitutes.png)
+
+It is a first-pass screening tool for room-temperature structural metals. See the limits panel on the page and section 8.
+
 ## 8. Limitations
 See `reports/limitations_log.md` for the full list. The main ones: metals only (no superalloys or ceramics); no thermal conductivity, creep, fatigue, corrosion, service temperature or cost, so the tool is a first-pass screen, not a final selection tool; hardness excluded; modulus is a coarse family-level value in the source (magnesium equals aluminium); results depend on the log transform and on modulus; family labels are rule-based.
 
 ## 9. How to run
-1. Python 3.14 on Windows was used in development.
+1. Python 3.14 was used in development (FILL IN if different: the output of `python --version`).
 2. `python -m pip install -r requirements.txt`
 3. Download the dataset as described in `data/README.md`.
-4. `python -m jupyterlab`, then run the notebooks in order: `02_import_and_clean`, `03_eda`, `04_features_scaling`, `05_clustering`, `06_visualization`, `07_evaluation`, `08_recommender`. (`01_data_audit` is the initial audit, and `05a_assumption_check` is the evidence for excluding the assumed grey-iron values.) Use Kernel, then Restart and Run All Cells, in each.
-
+4. `python -m jupyterlab`, then run the notebooks in order: `02_import_and_clean`, `03_eda`, `04_features_scaling`, `05_clustering`, `06_visualization`, `07_evaluation`, `08_recommender`, `09_hardness_check`. Use Kernel, then Restart and Run All Cells, in each. (`01_data_audit` is the initial audit and `05a_assumption_check` is frozen evidence for excluding the assumed grey-iron values; do not re-run it.)
+5. Optional, for the interactive page: `python src/make_pca_coords.py` (saves the 2D map coordinates), then `python src/check_selector.py` (should end with ALL CHECKS PASSED), then `python -m streamlit run app.py`.
 
 ## 10. Acknowledgements
 Data: Autodesk Material Library via Kaggle (`purushottamnawale/materials`).
