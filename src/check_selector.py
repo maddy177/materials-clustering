@@ -21,6 +21,10 @@ top = recommend(all_df, scenarios["B shaft"][0], rank_by="yield_strength_MPa", t
 print("\nTop 3 for the shaft scenario:")
 print(top[["label", "tensile_strength_MPa", "elongation_pct"]].to_string(index=False))
 
+has_note = "note" in top.columns
+print("\nrecommend() returns a 'note' column:", "OK" if has_note else "MISSING (selector.py is out of date)")
+ok = ok and has_note
+
 sub = similar_to(X, meta, "Steel SAE 4140 | normalized", n=5)
 print("\nFive materials closest to Steel SAE 4140 | normalized:")
 print(sub[["family", "distance"]].to_string())

@@ -33,8 +33,26 @@ X, meta = get_scaled()
 all_families = sorted(all_df["family"].dropna().unique())
 
 st.title("Material selector")
-st.write("A first-pass screening tool for 1,256 structural metals. "
-         "Set your requirements on the left and the matching materials appear below.")
+st.info("First-pass screening tool for room-temperature structural metals. It uses strength, "
+        "yield, elongation, stiffness and density only. It has no creep, fatigue, corrosion, "
+        "service-temperature, thermal-conductivity or cost data, so check any shortlist "
+        "against those before choosing a material.")
+
+with st.expander("About the data and its limits"):
+    st.write("Source: Autodesk Material Library via Kaggle, 1,256 materials after cleaning. "
+             "Scope: steel, stainless steel, aluminium, copper alloys, cast iron and magnesium. "
+             "There are no superalloys, titanium or ceramics.")
+    st.write("Elongation was missing for about 12% of materials. Those values were estimated from "
+             "similar materials (typical error about a factor of 1.6) and are marked "
+             "'elongation estimated'.")
+    st.write("21 grey cast iron rows have no reported elongation. They are kept in the shortlist "
+             "but were not clustered, so they have no position on the cluster map. They disappear "
+             "from results whenever you set a minimum elongation.")
+    st.write("Young's modulus in the source is close to one value per family, and magnesium has the "
+             "same value as aluminium (the textbook value is lower), so treat stiffness rankings "
+             "with caution.")
+    st.write("Clusters group by mechanical similarity, not composition: stainless steel is not "
+             "separated from plain steel.")
 
 st.sidebar.header("Requirements")
 min_tensile = st.sidebar.slider("Minimum tensile strength (MPa)", 0, 2200, 0, step=10)
@@ -56,6 +74,25 @@ if min_elong > 0:
 if max_density < 9.0:
     constraints["density_g_cm3"] = (None, max_density)
 
+# Step 8: check the page's filter against the numbers from notebook 08
+with st.sidebar.expander("Self-check"):
+    st.write("Re-runs the three notebook scenarios on the full data and compares the match counts.")
+    if st.button("Run check"):
+        checks = {
+            "A lightweight (tensile >= 300, density <= 3)":
+                ({"tensile_strength_MPa": (300, None), "density_g_cm3": (None, 3.0)}, 65),
+            "B shaft (tensile >= 900, elongation >= 10)":
+                ({"tensile_strength_MPa": (900, None), "elongation_pct": (10, None)}, 99),
+            "C formed part (tensile >= 300, elongation >= 30)":
+                ({"tensile_strength_MPa": (300, None), "elongation_pct": (30, None)}, 157),
+        }
+        for name, (cons, expected) in checks.items():
+            n = len(filter_materials(all_df, cons))
+            if n == expected:
+                st.success(f"{name}: {n} (expected {expected})")
+            else:
+                st.error(f"{name}: {n} (expected {expected})")
+
 tab1, tab2, tab3 = st.tabs(["Find materials", "Cluster map", "Find substitutes"])
 
 with tab1:
@@ -67,11 +104,19 @@ with tab1:
         if matches.empty:
             st.warning("No material satisfies all requirements. Relax one.")
         else:
+            if rank_by == "youngs_modulus_GPa" and "Magnesium" in families:
+                st.warning("Magnesium's modulus in the source equals aluminium's. "
+                           "Treat stiffness rankings that include magnesium as unreliable.")
             st.write("Matches by cluster")
             st.bar_chart(matches["cluster_name"].value_counts())
             st.write(f"Top {min(top, len(matches))} matches, ranked by {rank_by}")
             table = recommend(all_df, constraints, rank_by=rank_by, top=top, families=families)
             st.dataframe(table, hide_index=True)
+            n_est = int((table["note"] == "elongation estimated").sum())
+            n_grey = int(table["note"].str.startswith("elongation not reported").sum())
+            if n_est or n_grey:
+                st.write(f"In this table, {n_est} row(s) have an estimated elongation and "
+                         f"{n_grey} grey-iron row(s) have no reported elongation.")
 
 with tab2:
     if not families:

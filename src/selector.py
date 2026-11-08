@@ -19,6 +19,7 @@ def load_all():
     """All 1,256 materials (1,235 clustered + 21 grey-iron rows kept aside)."""
     all_df = pd.read_csv(DATA_DIR / "materials_clustered_all.csv")
     all_df["elongation_assumed"] = all_df["elongation_assumed"].fillna(False).astype(bool)
+    all_df["elongation_imputed"] = all_df["elongation_imputed"].fillna(False).astype(bool)
     # grey iron: the 0.5% was an assumption, so show it as "not reported"
     all_df.loc[all_df["elongation_assumed"], "elongation_pct"] = np.nan
     all_df["specific_strength"] = all_df["tensile_strength_MPa"] / all_df["density_g_cm3"]
@@ -48,9 +49,12 @@ def filter_materials(all_df, constraints, families=None):
 
 def recommend(all_df, constraints, rank_by="specific_strength", ascending=False,
               top=8, families=None):
-    """The best `top` matches, ranked by one property."""
+    """The best `top` matches, ranked by one property, with a note on uncertain values."""
     matches = filter_materials(all_df, constraints, families)
-    return matches.sort_values(rank_by, ascending=ascending).head(top)[SHOW].round(1).reset_index(drop=True)
+    out = matches.sort_values(rank_by, ascending=ascending).head(top).copy()
+    out["note"] = np.where(out["elongation_assumed"], "elongation not reported; not clustered",
+                  np.where(out["elongation_imputed"], "elongation estimated", ""))
+    return out[SHOW + ["note"]].round(1).reset_index(drop=True)
 
 
 def similar_to(X, meta, label, n=5):
